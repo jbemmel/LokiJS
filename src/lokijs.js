@@ -3727,7 +3727,7 @@
             for (i = 0; i < len; i++) {
               obj = clone(data[i], method);
               if (options.removeMeta) {
-                delete obj.$loki;
+                delete obj[this.collection.idField];
                 delete obj.meta;
               }
               result.push(obj);
@@ -3752,7 +3752,7 @@
         for (i = 0; i < len; i++) {
           obj = clone(data[fr[i]], method);
           if (options.removeMeta) {
-            delete obj.$loki;
+            delete obj[this.collection.idField];
             delete obj.meta;
           }
           result.push(obj);
@@ -4845,6 +4845,10 @@
       /* OPTIONS */
       options = options || {};
 
+
+      // Allow customization of ID field name, default '$loki'
+      var idField = this.idField = options.idField || '$loki';
+
       // exact match and unique constraints
       if (options.hasOwnProperty('unique')) {
         if (!Array.isArray(options.unique)) {
@@ -4852,7 +4856,7 @@
         }
         options.unique.forEach(function (prop) {
           self.uniqueNames.push(prop); // used to regenerate on subsequent database loads
-          self.constraints.unique[prop] = new UniqueIndex(prop);
+          self.constraints.unique[prop] = new UniqueIndex(prop,idField);
         });
       }
 
@@ -4962,7 +4966,7 @@
         });
 
         changedObjects.forEach(function (object) {
-          if (!hasOwnProperty.call(object, '$loki'))
+          if (!hasOwnProperty.call(object, idField))
             return self.removeAutoUpdateObserver(object);
           try {
             self.update(object);
@@ -4991,7 +4995,7 @@
           for (var i = 0; i < propertyNames.length; i++) {
             var propertyName = propertyNames[i];
             if (newObject.hasOwnProperty(propertyName)) {
-              if (!oldObject.hasOwnProperty(propertyName) || self.uniqueNames.indexOf(propertyName) >= 0 || propertyName == '$loki' || propertyName == 'meta') {
+              if (!oldObject.hasOwnProperty(propertyName) || self.uniqueNames.indexOf(propertyName) >= 0 || propertyName == idField || propertyName == 'meta') {
                 delta[propertyName] = newObject[propertyName];
               }
               else {
@@ -5505,7 +5509,7 @@
       }
 
       // if index already existed, (re)loading it will likely cause collisions, rebuild always
-      this.constraints.unique[field] = index = new UniqueIndex(field);
+      this.constraints.unique[field] = index = new UniqueIndex(field,this.idField);
       this.data.forEach(function (obj) {
         index.set(obj);
       });
@@ -5569,7 +5573,7 @@
 
       this.idIndex = [];
       for (i; i < len; i += 1) {
-        this.idIndex.push(this.data[i].$loki);
+        this.idIndex.push(this.data[i][this.idField]);
       }
     };
 
@@ -5867,12 +5871,12 @@
       }
 
       // verify object is a properly formed document
-      if (!hasOwnProperty.call(doc, '$loki')) {
+      if (!hasOwnProperty.call(doc, this.idField)) {
         throw new Error('Trying to update unsynced document. Please save the document first by using insert() or addMany()');
       }
       try {
         this.startTransaction();
-        var arr = this.get(doc.$loki, true),
+        var arr = this.get(doc[this.idField], true),
           oldInternal,   // ref to existing obj
           newInternal, // ref to new internal obj
           position,
@@ -5919,11 +5923,11 @@
           this.flagBinaryIndexesDirty();
         }
 
-        this.idIndex[position] = newInternal.$loki;
+        this.idIndex[position] = newInternal[this.idField];
         //this.flagBinaryIndexesDirty();
 
         if (this.isIncremental) {
-          this.dirtyIds.push(newInternal.$loki);
+          this.dirtyIds.push(newInternal[this.idField]);
         }
 
         this.commit();
@@ -5968,7 +5972,7 @@
       // if object you are adding already has id column it is either already in the collection
       // or the object is carrying its own 'id' property.  If it also has a meta property,
       // then this is already in collection so throw error, otherwise rename to originalId and continue adding.
-      if (typeof (obj.$loki) !== 'undefined') {
+      if (typeof (obj[this.idField]) !== 'undefined') {
         throw new Error('Document is already in collection, please use update()');
       }
 
@@ -5980,10 +5984,10 @@
         this.maxId++;
 
         if (isNaN(this.maxId)) {
-          this.maxId = (this.data[this.data.length - 1].$loki + 1);
+          this.maxId = (this.data[this.data.length - 1][this.idField] + 1);
         }
 
-        obj.$loki = this.maxId;
+        obj[this.idField] = this.maxId;
 
         if (!this.disableMeta) {
           obj.meta.version = 0;
@@ -5997,9 +6001,9 @@
         }
 
         // add new obj id to idIndex
-        this.idIndex.push(obj.$loki);
+        this.idIndex.push(obj[this.idField]);
         if (this.isIncremental) {
-          this.dirtyIds.push(obj.$loki);
+          this.dirtyIds.push(obj[this.idField]);
         }
 
         // add the object
@@ -6150,7 +6154,7 @@
         // remove from data[] :
         // filter collection data for items not in inclusion hashobject
         this.data = this.data.filter(function(obj) {
-          return !xo[obj.$loki];
+          return !xo[obj[this.idField]];
         });
 
         // remove from idIndex[] :
@@ -6194,13 +6198,13 @@
 
       // create lookup hashobject to translate $loki id to position
       for (idx=0; idx < dlen; idx++) {
-        xlt[this.data[idx].$loki] = idx;
+        xlt[this.data[idx][this.idField]] = idx;
       }
 
       // iterate the batch
       for (idx=0; idx < len; idx++) {
         if (typeof(batch[idx]) === 'object') {
-          posx.push(xlt[batch[idx].$loki]);
+          posx.push(xlt[batch[idx][this.idField]]);
         }
         else {
           posx.push(xlt[batch[idx]]);
@@ -6228,13 +6232,13 @@
         return;
       }
 
-      if (!hasOwnProperty.call(doc, '$loki')) {
+      if (!hasOwnProperty.call(doc, this.idField)) {
         throw new Error('Object is not a document stored in the collection');
       }
 
       try {
         this.startTransaction();
-        var arr = this.get(doc.$loki, true),
+        var arr = this.get(doc[this.idField], true),
           // obj = arr[0],
           position = arr[1];
         var self = this;
@@ -6267,13 +6271,13 @@
         this.idIndex.splice(position, 1);
 
         if (this.isIncremental) {
-          this.dirtyIds.push(doc.$loki);
+          this.dirtyIds.push(doc[this.idField]);
         }
 
         this.commit();
         this.dirty = true; // for autosave scenarios
         this.emit('delete', arr[0]);
-        delete doc.$loki;
+        delete doc[this.idField];
         delete doc.meta;
         return doc;
 
@@ -7026,7 +7030,7 @@
      */
     Collection.prototype.stage = function (stageName, obj) {
       var copy = JSON.parse(JSON.stringify(obj));
-      this.getStage(stageName)[obj.$loki] = copy;
+      this.getStage(stageName)[obj[this.idField]] = copy;
       return copy;
     };
 
@@ -7103,11 +7107,11 @@
         if (max !== undefined) {
           if (max < deepProperty(this.data[i], field, deep)) {
             max = deepProperty(this.data[i], field, deep);
-            result.index = this.data[i].$loki;
+            result.index = this.data[i][this.idField];
           }
         } else {
           max = deepProperty(this.data[i], field, deep);
-          result.index = this.data[i].$loki;
+          result.index = this.data[i][this.idField];
         }
       }
       result.value = max;
@@ -7131,11 +7135,11 @@
         if (min !== undefined) {
           if (min > deepProperty(this.data[i], field, deep)) {
             min = deepProperty(this.data[i], field, deep);
-            result.index = this.data[i].$loki;
+            result.index = this.data[i][this.idField];
           }
         } else {
           min = deepProperty(this.data[i], field, deep);
-          result.index = this.data[i].$loki;
+          result.index = this.data[i][this.idField];
         }
       }
       result.value = min;
@@ -7336,10 +7340,11 @@
       }
     };
 
-    function UniqueIndex(uniqueField) {
+    function UniqueIndex(uniqueField,idField) {
       this.field = uniqueField;
       this.keyMap = {};
       this.lokiMap = {};
+      this.idField = idField;
     }
     UniqueIndex.prototype.keyMap = {};
     UniqueIndex.prototype.lokiMap = {};
@@ -7350,7 +7355,7 @@
           throw new Error('Duplicate key for property ' + this.field + ': ' + fieldValue);
         } else {
           this.keyMap[fieldValue] = obj;
-          this.lokiMap[obj.$loki] = fieldValue;
+          this.lokiMap[obj[this.idField]] = fieldValue;
         }
       }
     };
@@ -7367,8 +7372,8 @@
      * @param  {Object} doc New document object (likely the same as obj)
      */
     UniqueIndex.prototype.update = function (obj, doc) {
-      if (this.lokiMap[obj.$loki] !== doc[this.field]) {
-        var old = this.lokiMap[obj.$loki];
+      if (this.lokiMap[obj[this.idField]] !== doc[this.field]) {
+        var old = this.lokiMap[obj[this.idField]];
         this.set(doc);
         // make the old key fail bool test, while avoiding the use of delete (mem-leak prone)
         this.keyMap[old] = undefined;
@@ -7380,7 +7385,7 @@
       var obj = this.keyMap[key];
       if (obj !== null && typeof obj !== 'undefined') {
         this.keyMap[key] = undefined;
-        this.lokiMap[obj.$loki] = undefined;
+        this.lokiMap[obj[this.idField]] = undefined;
       } else {
         throw new Error('Key is not in unique index: ' + this.field);
       }
