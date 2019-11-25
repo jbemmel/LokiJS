@@ -6241,6 +6241,7 @@
         var arr = this.get(doc[this.idField], true),
           // obj = arr[0],
           position = arr[1];
+        console.log( "JvB: remove() id="+this.idField+" arr="+JSON.stringify(arr) );
         var self = this;
         Object.keys(this.constraints.unique).forEach(function (key) {
           if (doc[key] !== null && typeof doc[key] !== 'undefined') {

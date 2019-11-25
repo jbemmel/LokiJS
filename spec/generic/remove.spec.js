@@ -83,8 +83,10 @@ describe('remove', function () {
       name: 'jack',
       age: 20
     });
+    console.log( JSON.stringify(users1.data) );
     expect(users1.data.length).toEqual(2);
     users1.removeDataOnly();
+    console.log( JSON.stringify(users1.data) );
     expect(users1.data.length).toEqual(0);
   });
 });
