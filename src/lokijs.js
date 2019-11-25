@@ -1714,6 +1714,7 @@
         copyColl.autoupdate = coll.autoupdate;
         copyColl.changes = coll.changes;
         copyColl.dirtyIds = coll.dirtyIds || [];
+        copyColl.idField = coll.idField || '$loki';
 
         if (options && options.retainDirtyFlags === true) {
           copyColl.dirty = coll.dirty;
@@ -5568,6 +5569,7 @@
      * Rebuild idIndex
      */
     Collection.prototype.ensureId = function () {
+      if ( !this.idField ) console.error( "***** NO idField *****" );
       var len = this.data.length,
         i = 0;
 
